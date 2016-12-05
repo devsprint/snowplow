@@ -27,7 +27,12 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 
 import com.amazonaws.services.kinesis.model.Record
+import com.fasterxml.jackson.databind.JsonNode
+import com.snowplowanalytics.iglu.client.{ProcessingMessageNel, SchemaKey}
+import com.snowplowanalytics.snowplow.enrich.common.{JsonSchemaPairs, ValidatedEnrichedEvent}
 import com.snowplowanalytics.snowplow.enrich.common.loaders.{CollectorPayload, TsvLoader}
+
+import scala.collection.immutable.Seq
 
 // Amazon
 import com.amazonaws.auth._
@@ -59,8 +64,8 @@ import iglu.client.validation.ProcessingMessageMethods._
 // Snowplow
 import sinks._
 import common.outputs.{
-  EnrichedEvent,
-  BadRow
+EnrichedEvent,
+BadRow
 }
 import common.loaders.ThriftLoader
 import common.enrichments.EnrichmentRegistry
@@ -78,11 +83,11 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 object AbstractSource {
 
   /**
-   * If a bad row JSON is too big, reduce it's size
-   *
-   * @param value Bad row JSON which is too large
-   * @return Bad row JSON with `size` field instead of `line` field
-   */
+    * If a bad row JSON is too big, reduce it's size
+    *
+    * @param value Bad row JSON which is too large
+    * @return Bad row JSON with `size` field instead of `line` field
+    */
   def adjustOversizedFailureJson(value: String): String = {
     val size = getSize(value)
     try {
@@ -92,7 +97,9 @@ object AbstractSource {
         case _ => false
       }
 
-      compact(render({("size" -> size): JValue} merge jsonWithoutLine))
+      compact(render({
+        ("size" -> size): JValue
+      } merge jsonWithoutLine))
 
     } catch {
       case NonFatal(e) =>
@@ -101,34 +108,34 @@ object AbstractSource {
   }
 
   /**
-   * Convert a too-large successful event to a failure
-   *
-   * @param value Event which passed enrichment but was too large
-   * @param maximum Maximum allowable bytes
-   * @return Bad row JSON
-   */
+    * Convert a too-large successful event to a failure
+    *
+    * @param value   Event which passed enrichment but was too large
+    * @param maximum Maximum allowable bytes
+    * @return Bad row JSON
+    */
   def oversizedSuccessToFailure(value: String, maximum: Long): String = {
     val size = AbstractSource.getSize(value)
     BadRow.oversizedRow(size, NonEmptyList(s"Enriched event size of $size bytes is greater than allowed maximum of $maximum"))
   }
 
   /**
-   * The size of a string in bytes
-   *
-   * @param evt
-   * @return size
-   */
+    * The size of a string in bytes
+    *
+    * @param evt
+    * @return size
+    */
   def getSize(evt: String): Long = ByteBuffer.wrap(evt.getBytes(UTF_8)).capacity
 }
 
 /**
- * Abstract base for the different sources
- * we support.
- */
+  * Abstract base for the different sources
+  * we support.
+  */
 abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolver,
-                              enrichmentRegistry: EnrichmentRegistry, 
+                              enrichmentRegistry: EnrichmentRegistry,
                               tracker: Option[Tracker]) {
-  
+
   val MaxRecordSize = if (config.sink == Sink.Kinesis) {
     Some(MaxBytes)
   } else {
@@ -136,8 +143,8 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
   }
 
   /**
-   * Never-ending processing loop over source stream.
-   */
+    * Never-ending processing loop over source stream.
+    */
   def run
 
   // Initialize a kinesis provider to use with a Kinesis source or sink.
@@ -153,12 +160,12 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
   protected val shredBadSink = getThreadLocalSink(InputType.ShredBad)
 
   /**
-   * We need the sink to be ThreadLocal as otherwise a single copy
-   * will be shared between threads for different shards
-   *
-   * @param inputType Whether the sink is for good events or bad events
-   * @return ThreadLocal sink
-   */
+    * We need the sink to be ThreadLocal as otherwise a single copy
+    * will be shared between threads for different shards
+    *
+    * @param inputType Whether the sink is for good events or bad events
+    * @return ThreadLocal sink
+    */
   private def getThreadLocalSink(inputType: InputType.InputType) = new ThreadLocal[Option[ISink]] {
     override def initialValue = config.sink match {
       case Sink.Kafka => new KafkaSink(config, inputType, tracker).some
@@ -174,29 +181,19 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
   // the fields to a string.
   def tabSeparateEnrichedEvent(output: EnrichedEvent): String = {
     output.getClass.getDeclaredFields
-    .map{ field =>
-      field.setAccessible(true)
-      Option(field.get(output)).getOrElse("")
-    }.mkString("\t")
-  }
-
-  // Iterate through an enriched EnrichedEvent object and tab separate
-  // the fields to a string.
-  def tabSeparateShreddedEvent(output: CollectorPayload): String = {
-    output.getClass.getDeclaredFields
-      .map{ field =>
+      .map { field =>
         field.setAccessible(true)
         Option(field.get(output)).getOrElse("")
       }.mkString("\t")
   }
 
   /**
-   * Convert incoming binary Thrift records to lists of enriched events
-   *
-   * @param binaryData Thrift raw event
-   * @return List containing successful or failed events, each with a
-   *         partition key
-   */
+    * Convert incoming binary Thrift records to lists of enriched events
+    *
+    * @param binaryData Thrift raw event
+    * @return List containing successful or failed events, each with a
+    *         partition key
+    */
   def enrichEvents(binaryData: Array[Byte]): List[Validation[(String, String), (String, String)]] = {
     val canonicalInput: ValidatedMaybeCollectorPayload = ThriftLoader.toCollectorPayload(binaryData)
     val processedEvents: List[ValidationNel[String, EnrichedEvent]] = EtlPipeline.processEvents(
@@ -207,10 +204,10 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
     processedEvents.map(validatedMaybeEvent => {
       validatedMaybeEvent match {
         case Success(co) => (tabSeparateEnrichedEvent(co), if (config.useIpAddressAsPartitionKey) {
-            co.user_ipaddress
-          } else {
-            UUID.randomUUID.toString
-          }).success
+          co.user_ipaddress
+        } else {
+          UUID.randomUUID.toString
+        }).success
         case Failure(errors) => {
           val line = new String(Base64.encodeBase64(binaryData), UTF_8)
           (BadRow(line, errors).toCompactJson -> Random.nextInt.toString).fail
@@ -220,20 +217,20 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
   }
 
   /**
-   * Deserialize and enrich incoming Thrift records and store the results
-   * in the appropriate sinks. If doing so causes the number of events
-   * stored in a sink to become sufficiently large, all sinks are flushed
-   * and we return `true`, signalling that it is time to checkpoint
-   *
-   * @param binaryData Thrift raw event
-   * @return Whether to checkpoint
-   */
+    * Deserialize and enrich incoming Thrift records and store the results
+    * in the appropriate sinks. If doing so causes the number of events
+    * stored in a sink to become sufficiently large, all sinks are flushed
+    * and we return `true`, signalling that it is time to checkpoint
+    *
+    * @param binaryData Thrift raw event
+    * @return Whether to checkpoint
+    */
   def enrichAndStoreEvents(binaryData: List[Array[Byte]]): Boolean = {
     val enrichedEvents = binaryData.flatMap(enrichEvents(_))
     val successes = enrichedEvents collect { case Success(s) => s }
     val sizeUnadjustedFailures = enrichedEvents collect { case Failure(s) => s }
     val failures = sizeUnadjustedFailures map {
-      case (value, key) => if (! isTooLarge(value)) {
+      case (value, key) => if (!isTooLarge(value)) {
         value -> key
       } else {
         AbstractSource.adjustOversizedFailureJson(value) -> key
@@ -264,35 +261,73 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
   /**
     * Shread means that we will retrive all json fields from atomic.events, validate them and stored in derived topic.
     * The original atomic event will be updated to not include json fields.
+    *
     * @param records
     * @return
     */
   def shredAndStoreEvents(records: List[Array[Byte]]): Boolean = {
-    records.foreach(t => println(new String(t)))
+
+    val common: Seq[ValidatedNel[(String, String, JsonSchemaPairs)]] = records.map(t => new String(t)).map { l: String =>
+      ShredJob.loadAndShred(l)
+    }
+
+    common.foreach(println)
+
+    val bad: Seq[ProcessingMessageNel] = common.flatMap { o: ValidatedNel[EventComponents] =>
+      ShredJob.projectBads(o)
+    }
+
+    val good: Seq[(String, String, JsonSchemaPairs)] = common.flatMap{ o: ValidatedNel[EventComponents] =>
+      ShredJob.projectGoods(o)
+    }
+
+
+    val altered = good.flatMap { t =>
+      ShredJob.alterEnrichedEvent(t._1)
+    }
+
+
+
+    println(altered)
+
+
+    //    records.map { t =>
+    //      val event = new String(t).map('line -> 'output) { l: String =>
+    //        ShredJob.loadAndShred(l)
+    //      }
+    //      val bad = event.flatMap('output -> 'errors) { o: ValidatedNel[EventComponents] =>
+    //        ShredJob.projectBads(o)
+    //      }
+    //        .mapTo(('line, 'errors) -> 'json) { both: (String, ProcessingMessageNel) =>
+    //          new BadRow(both._1, both._2).toCompactJson
+    //        }
+    //        .write()
+    //      val good = ShredJob.projectGoods(event)
+    //
+    //      good
+    //    }
 
 
     true
   }
 
-//  def shredEvent(binaryData: Array[Byte]): Validation[(String, String), (String, String)] = {
-//    val canonicalInput: ValidatedMaybeCollectorPayload =TsvLoader("UTF-8").toCollectorPayload(String.valueOf(binaryData))
-//    canonicalInput match {
-//      case Success(co) => (tabSeparateShreddedEvent(co.getOrElse(CollectorPayload())),  UUID.randomUUID.toString).success
-//      case Failure(errors) =>
-//      val line = new String(Base64.encodeBase64(binaryData), UTF_8)
-//      (BadRow(line, errors).toCompactJson -> Random.nextInt.toString).fail
-//
-//    }
-//
-//    //EnrichedEventLoader.
-//  }
+  def shredEvent(binaryData: Array[Byte]): Validation[(String, String), (String, String)] = {
+    val canonicalInput: ValidatedEnrichedEvent = EnrichedEventLoader.toEnrichedEvent(String.valueOf(binaryData))
+    canonicalInput match {
+      case Success(co) => (tabSeparateEnrichedEvent(co), UUID.randomUUID.toString).success
+      case Failure(errors) =>
+        val line = new String(Base64.encodeBase64(binaryData), UTF_8)
+        (BadRow(line, errors).toCompactJson -> Random.nextInt.toString).fail
+
+    }
+  }
 
   /**
-   * Whether a record is too large to send to Kinesis
-   *
-   * @param evt
-   * @return boolean size decision
-   */
+    * Whether a record is too large to send to Kinesis
+    *
+    * @param evt
+    * @return boolean size decision
+    */
   private def isTooLarge(evt: String): Boolean = MaxRecordSize match {
     case None => false
     case Some(m) => AbstractSource.getSize(evt) >= m

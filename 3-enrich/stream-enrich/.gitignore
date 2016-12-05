@@ -11,3 +11,4 @@ project/boot/
 project/plugins/project/
 
 src/main/resources/AwsCredentials.properties
+.idea

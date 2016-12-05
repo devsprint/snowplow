@@ -45,8 +45,10 @@ class KafkaSink(config: KinesisEnrichConfig,
   import log.{error, debug, info, trace}
 
   private val topicName = inputType match {
-    case InputType.Good => config.enrichedOutStream
-    case InputType.Bad => config.badOutStream
+    case InputType.EnrichGood => config.enrichedOutStream
+    case InputType.EnrichBad => config.badOutStream
+    case InputType.ShredGood => config.shredOutStream
+    case InputType.ShredBad => config.badShredOutStream
   }
 
   private val kafkaProducer = createProducer(config)
@@ -68,8 +70,10 @@ class KafkaSink(config: KinesisEnrichConfig,
 
     // Log BadRows
     inputType match {
-      case InputType.Good => None
-      case InputType.Bad  => events.foreach(e => debug(s"BadRow: ${e._1}"))
+      case InputType.EnrichGood => None
+      case InputType.EnrichBad  => events.foreach(e => debug(s"BadRow: ${e._1}"))
+      case InputType.ShredGood => None
+      case InputType.ShredBad => None
     }
 
     for ((value, key) <- events) {

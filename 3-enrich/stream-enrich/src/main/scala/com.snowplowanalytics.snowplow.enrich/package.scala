@@ -12,6 +12,11 @@
  */
 package com.snowplowanalytics.snowplow.enrich
 
+import com.github.fge.jsonschema.core.report.ProcessingMessage
+import com.snowplowanalytics.iglu.client.JsonSchemaPair
+
+import scalaz.{Validation, ValidationNel}
+
 /**
  * Scala package object to hold types,
  * helper methods etc.
@@ -40,4 +45,12 @@ package object kinesis {
     type Sink = Value
     val Kafka, Kinesis, Stdouterr, Test = Value
   }
+
+  type Validated[A] = Validation[ProcessingMessage, A]
+  type ValidatedNel[A] = ValidationNel[ProcessingMessage, A]
+
+  /**
+    * Convenient for passing around the parts of an event
+    */
+  type EventComponents = Tuple3[String, String, List[JsonSchemaPair]]
 }

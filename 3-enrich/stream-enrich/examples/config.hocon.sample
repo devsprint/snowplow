@@ -78,6 +78,18 @@ enrich {
       }
     }
 
+    shred-out: {
+      shredded: "{{shredStreamsOutShred}}"
+      bad: "{{shredStreamsOutBad}}"
+
+       # Minimum and maximum backoff periods
+       # - Units: Milliseconds
+       backoffPolicy: {
+         minBackoff: {{shredStreamsOutMinBackoff}}
+         maxBackoff: {{shredStreamsOutMaxBackoff}}
+       }
+    }
+
     # "app-name" is used for a DynamoDB table to maintain stream state.
     # "app-name" is used as the Kafka consumer group ID.
     # You can set it automatically using: "SnowplowKinesisEnrich-$\\{enrich.streams.in.raw\\}"

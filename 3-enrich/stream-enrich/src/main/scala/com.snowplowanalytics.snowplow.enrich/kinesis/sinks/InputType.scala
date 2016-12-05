@@ -19,9 +19,10 @@
 package com.snowplowanalytics.snowplow.enrich.kinesis.sinks
 
 /**
- * Whether the sink is for good rows or bad rows
- */
+  * Whether the sink is for good rows or bad rows
+  */
 object InputType extends Enumeration {
   type InputType = Value
-  val Good, Bad = Value
+  val EnrichGood, EnrichBad = Value
+  val ShredGood, ShredBad = Value
 }

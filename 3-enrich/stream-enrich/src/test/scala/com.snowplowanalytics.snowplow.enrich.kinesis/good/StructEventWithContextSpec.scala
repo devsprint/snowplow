@@ -189,3 +189,19 @@ class StructEventWithContextSpec extends Specification with ValidationMatchers {
     }
   }
 }
+
+class EnrichedEventWithContextSpec extends Specification with ValidationMatchers {
+  "Stream Shred" should {
+    "shred the enriched event" in {
+      val rawEvent = Base64.decodeBase64(StructEventWithContextSpec.raw)
+
+      val enrichedEvent = TestSource.enrichEvents(rawEvent)(0)
+      enrichedEvent must beSuccessful
+
+      val shrededEvent = TestSource.shredAndStoreEvents(enrichedEvent.toStream.toList.map(_._1.toArray.map(_.toByte)))
+
+      shrededEvent must beTrue
+
+    }
+  }
+}

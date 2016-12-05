@@ -75,8 +75,10 @@ class KinesisSink(provider: AWSCredentialsProvider,
   import log.{error, debug, info, trace}
 
   private val name = inputType match {
-    case InputType.Good => config.enrichedOutStream
-    case InputType.Bad => config.badOutStream
+    case InputType.EnrichGood => config.enrichedOutStream
+    case InputType.EnrichBad => config.badOutStream
+    case InputType.ShredGood => config.shredOutStream
+    case InputType.ShredBad => config.badShredOutStream
   }
 
   private val maxBackoff = config.maxBackoff
@@ -228,8 +230,10 @@ class KinesisSink(provider: AWSCredentialsProvider,
 
     // Log BadRows
     inputType match {
-      case InputType.Good => None
-      case InputType.Bad  => events.foreach(e => debug(s"BadRow: ${e._1}"))
+      case InputType.EnrichGood => None
+      case InputType.EnrichBad  => events.foreach(e => debug(s"BadRow: ${e._1}"))
+      case InputType.ShredGood  => None
+      case InputType.ShredBad   => events.foreach(e => debug(s"BadRow: ${e._1}"))
     }
 
     if (!EventStorage.currentBatch.isEmpty && System.currentTimeMillis() > nextRequestTime) {

@@ -26,6 +26,9 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.UUID
 
+import com.amazonaws.services.kinesis.model.Record
+import com.snowplowanalytics.snowplow.enrich.common.loaders.{CollectorPayload, TsvLoader}
+
 // Amazon
 import com.amazonaws.auth._
 
@@ -141,9 +144,13 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
   protected val kinesisProvider = config.credentialsProvider
 
   // Initialize the sink to output enriched events to.
-  protected val sink = getThreadLocalSink(InputType.Good)
+  protected val enrichSink = getThreadLocalSink(InputType.EnrichGood)
 
-  protected val badSink = getThreadLocalSink(InputType.Bad)
+  protected val enrichBadSink = getThreadLocalSink(InputType.EnrichBad)
+
+  protected val shredSink = getThreadLocalSink(InputType.ShredGood)
+
+  protected val shredBadSink = getThreadLocalSink(InputType.ShredBad)
 
   /**
    * We need the sink to be ThreadLocal as otherwise a single copy
@@ -171,6 +178,16 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
       field.setAccessible(true)
       Option(field.get(output)).getOrElse("")
     }.mkString("\t")
+  }
+
+  // Iterate through an enriched EnrichedEvent object and tab separate
+  // the fields to a string.
+  def tabSeparateShreddedEvent(output: CollectorPayload): String = {
+    output.getClass.getDeclaredFields
+      .map{ field =>
+        field.setAccessible(true)
+        Option(field.get(output)).getOrElse("")
+      }.mkString("\t")
   }
 
   /**
@@ -230,19 +247,45 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
       m <- MaxRecordSize
     } yield AbstractSource.oversizedSuccessToFailure(value, m) -> key
 
-    val successesTriggeredFlush = sink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
-    val failuresTriggeredFlush = badSink.get.map(_.storeEnrichedEvents(failures ++ sizeBasedFailures))
+    val successesTriggeredFlush = enrichSink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
+    val failuresTriggeredFlush = enrichBadSink.get.map(_.storeEnrichedEvents(failures ++ sizeBasedFailures))
     if (successesTriggeredFlush == Some(true) || failuresTriggeredFlush == Some(true)) {
 
       // Block until the records have been sent to Kinesis
-      sink.get.foreach(_.flush)
-      badSink.get.foreach(_.flush)
+      enrichSink.get.foreach(_.flush)
+      enrichBadSink.get.foreach(_.flush)
       true
     } else {
       false
     }
 
   }
+
+  /**
+    * Shread means that we will retrive all json fields from atomic.events, validate them and stored in derived topic.
+    * The original atomic event will be updated to not include json fields.
+    * @param records
+    * @return
+    */
+  def shredAndStoreEvents(records: List[Array[Byte]]): Boolean = {
+    records.foreach(t => println(new String(t)))
+
+
+    true
+  }
+
+//  def shredEvent(binaryData: Array[Byte]): Validation[(String, String), (String, String)] = {
+//    val canonicalInput: ValidatedMaybeCollectorPayload =TsvLoader("UTF-8").toCollectorPayload(String.valueOf(binaryData))
+//    canonicalInput match {
+//      case Success(co) => (tabSeparateShreddedEvent(co.getOrElse(CollectorPayload())),  UUID.randomUUID.toString).success
+//      case Failure(errors) =>
+//      val line = new String(Base64.encodeBase64(binaryData), UTF_8)
+//      (BadRow(line, errors).toCompactJson -> Random.nextInt.toString).fail
+//
+//    }
+//
+//    //EnrichedEventLoader.
+//  }
 
   /**
    * Whether a record is too large to send to Kinesis

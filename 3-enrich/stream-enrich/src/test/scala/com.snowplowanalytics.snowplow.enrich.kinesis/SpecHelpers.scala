@@ -257,6 +257,18 @@ enrich {
         maxBackoff: 600000 # 5 minutes
       }
     }
+    shred-out: {
+      shredded: "ShowplowShredded"
+      bad: "SnowplowShreddedBad"
+
+      # Minimum and maximum backoff periods
+      # - Units: Milliseconds
+      backoffPolicy: {
+        minBackoff: 3000
+        maxBackoff: 600000
+      }
+    }
+
     app-name: SnowplowKinesisEnrich-${enrich.streams.in.raw}
     initial-position = "TRIM_HORIZON"
     region: "us-east-1"

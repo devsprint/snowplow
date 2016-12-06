@@ -29,8 +29,8 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
   extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
 
   lazy val log = LoggerFactory.getLogger(getClass())
-  import log.{error, debug, info, trace}
 
+  import log.{error, debug, info, trace}
 
 
   /**
@@ -75,7 +75,7 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
     }
   }
 
-  class EnrichedEventProcessor(config: KinesisEnrichConfig, sink: ISink) extends  IRecordProcessor {
+  class EnrichedEventProcessor(config: KinesisEnrichConfig, sink: ISink) extends IRecordProcessor {
 
     private var kinesisShardId: String = _
 
@@ -111,7 +111,9 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
     private def processRecordsWithRetries(records: List[Record]): Boolean = {
       try {
         // TODO: from an enriched event to shred.
-        shredAndStoreEvents(records.map(_.getData.array).toList)
+        val events = records.map(_.getData.array).map(t => new String(t)).toList
+        storeAlteredAtomicEvents(events)
+        shredAndStoreEvents(events)
         true
       } catch {
         case NonFatal(e) =>
@@ -122,11 +124,10 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
     }
 
 
-
     private def checkpoint(checkpointer: IRecordProcessorCheckpointer) = {
       info(s"Checkpointing shard $kinesisShardId")
       breakable {
-        for (i <- 0 to NUM_RETRIES-1) {
+        for (i <- 0 to NUM_RETRIES - 1) {
           try {
             checkpointer.checkpoint()
             break
@@ -136,9 +137,9 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
               break
             case e: ThrottlingException =>
               if (i >= (NUM_RETRIES - 1)) {
-                error(s"Checkpoint failed after ${i+1} attempts.", e)
+                error(s"Checkpoint failed after ${i + 1} attempts.", e)
               } else {
-                info(s"Transient issue when checkpointing - attempt ${i+1} of "
+                info(s"Transient issue when checkpointing - attempt ${i + 1} of "
                   + NUM_RETRIES, e)
               }
             case e: InvalidStateException =>

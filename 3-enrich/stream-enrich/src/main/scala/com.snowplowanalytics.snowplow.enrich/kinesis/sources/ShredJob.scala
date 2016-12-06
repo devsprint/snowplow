@@ -12,7 +12,7 @@ import com.snowplowanalytics.snowplow.enrich.common.outputs.EnrichedEvent
 
 
 /**
-  * Created by gciuloaica on 05/12/2016.
+  * shread job inspired from hadoop based implementation of ShredJob.
   */
 object ShredJob {
 
@@ -71,8 +71,6 @@ object ShredJob {
 
   // Indexes for the contexts, unstruct_event, and derived_contexts fields
   private val IgnoredJsonFields = Set(52, 58, 122)
-
-  private val alteredEnrichedEventSubdirectory = "atomic-events"
 
   /**
     * Ready the enriched event for database load by removing JSON fields

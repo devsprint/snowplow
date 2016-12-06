@@ -262,63 +262,64 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
     * Shread means that we will retrive all json fields from atomic.events, validate them and stored in derived topic.
     * The original atomic event will be updated to not include json fields.
     *
-    * @param records
+    * @param events
     * @return
     */
-  def shredAndStoreEvents(records: List[Array[Byte]]): Boolean = {
+  def shredAndStoreEvents(events: List[String]): Boolean = {
 
-    val common: Seq[ValidatedNel[(String, String, JsonSchemaPairs)]] = records.map(t => new String(t)).map { l: String =>
+    val common: Seq[ValidatedNel[(String, String, JsonSchemaPairs)]] = events.map { l: String =>
       ShredJob.loadAndShred(l)
     }
-
-    common.foreach(println)
 
     val bad: Seq[ProcessingMessageNel] = common.flatMap { o: ValidatedNel[EventComponents] =>
       ShredJob.projectBads(o)
     }
 
-    val good: Seq[(String, String, JsonSchemaPairs)] = common.flatMap{ o: ValidatedNel[EventComponents] =>
+    val errors = shredBadSink.get().map(_.storeEnrichedEvents(bad.map(t => (t.toString(), "1")).toList))
+
+    val good: Seq[(String, String, JsonSchemaPairs)] = common.flatMap { o: ValidatedNel[EventComponents] =>
       ShredJob.projectGoods(o)
     }
 
-
-    val altered = good.flatMap { t =>
-      ShredJob.alterEnrichedEvent(t._1)
+    val goodPairs = good.flatMap(t => t._3).map(t => (t._1.name, t._2.asText())).toList
+    val jsons = shredSink.get().map(_.storeEnrichedEvents(goodPairs))
+    if (errors == Some(true) || jsons == Some(true)) {
+      shredSink.get().foreach(_.flush())
+      shredBadSink.get().foreach(_.flush())
+      true
+    } else {
+      false
     }
-
-
-
-    println(altered)
-
-
-    //    records.map { t =>
-    //      val event = new String(t).map('line -> 'output) { l: String =>
-    //        ShredJob.loadAndShred(l)
-    //      }
-    //      val bad = event.flatMap('output -> 'errors) { o: ValidatedNel[EventComponents] =>
-    //        ShredJob.projectBads(o)
-    //      }
-    //        .mapTo(('line, 'errors) -> 'json) { both: (String, ProcessingMessageNel) =>
-    //          new BadRow(both._1, both._2).toCompactJson
-    //        }
-    //        .write()
-    //      val good = ShredJob.projectGoods(event)
-    //
-    //      good
-    //    }
-
-
-    true
   }
 
-  def shredEvent(binaryData: Array[Byte]): Validation[(String, String), (String, String)] = {
-    val canonicalInput: ValidatedEnrichedEvent = EnrichedEventLoader.toEnrichedEvent(String.valueOf(binaryData))
-    canonicalInput match {
-      case Success(co) => (tabSeparateEnrichedEvent(co), UUID.randomUUID.toString).success
-      case Failure(errors) =>
-        val line = new String(Base64.encodeBase64(binaryData), UTF_8)
-        (BadRow(line, errors).toCompactJson -> Random.nextInt.toString).fail
+  def storeAlteredAtomicEvents(originalEvents: List[String]): Boolean = {
 
+    val altered = originalEvents.map(ShredJob.alterEnrichedEvent)
+    val alteredWithPartitionKey = altered.map {
+      event =>
+        (event, if (config.useIpAddressAsPartitionKey) {
+          //event.user_ipaddress
+          event.split("\t").toVector.drop(13).head
+        } else {
+          UUID.randomUUID.toString
+        })
+    }
+    val (tooBigSuccesses, smallEnoughSuccesses) = alteredWithPartitionKey partition { s => isTooLarge(s._1) }
+
+    val sizeBasedFailures = for {
+      (value, key) <- tooBigSuccesses
+      m <- MaxRecordSize
+    } yield AbstractSource.oversizedSuccessToFailure(value, m) -> key
+
+    val successesTriggeredFlush = shredSink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
+    val failuresTriggeredFlush = shredBadSink.get.map(_.storeEnrichedEvents(sizeBasedFailures))
+
+    if (successesTriggeredFlush == Some(true) || failuresTriggeredFlush == Some(true)) {
+      shredSink.get.foreach(_.flush())
+      shredBadSink.get.foreach(_.flush())
+      true
+    } else {
+      false
     }
   }
 

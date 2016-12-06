@@ -198,10 +198,15 @@ class EnrichedEventWithContextSpec extends Specification with ValidationMatchers
       val enrichedEvent = TestSource.enrichEvents(rawEvent)(0)
       enrichedEvent must beSuccessful
 
-      val enrichedString = enrichedEvent.toList.map(_._1.toArray.map(_.toByte))
-      val shrededEvent = TestSource.shredAndStoreEvents(enrichedString)
+      val enrichedString = enrichedEvent.toList.map(_._1)
 
-      shrededEvent must beTrue
+      val alteredEvent = TestSource.storeAlteredAtomicEvents(enrichedString)
+
+      alteredEvent must beFalse
+
+      val shredEvent = TestSource.shredAndStoreEvents(enrichedString)
+
+      shredEvent must beFalse
 
     }
   }

@@ -155,6 +155,7 @@ class KinesisSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichm
     private def processRecordsWithRetries(records: List[Record]): Boolean = {
       try {
         enrichAndStoreEvents(records.map(_.getData.array).toList)
+        storeAlteredAtomicEvents(records.map(_.getData.array).map(t => new String(t)).toList)
       } catch {
         case NonFatal(e) =>
           // TODO: send an event when something goes wrong here

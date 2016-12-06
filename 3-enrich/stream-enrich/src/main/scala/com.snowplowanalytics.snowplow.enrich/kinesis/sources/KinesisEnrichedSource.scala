@@ -113,7 +113,8 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
         // TODO: from an enriched event to shred.
         val events = records.map(_.getData.array).map(t => new String(t)).toList
         storeAlteredAtomicEvents(events)
-        shredAndStoreEvents(events)
+        // TODO: the derivated data should go into a different stream.
+        //shredAndStoreEvents(events)
         true
       } catch {
         case NonFatal(e) =>

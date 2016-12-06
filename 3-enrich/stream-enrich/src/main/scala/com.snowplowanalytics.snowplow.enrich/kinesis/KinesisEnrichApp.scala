@@ -180,11 +180,11 @@ object KinesisEnrichApp extends App {
     case Source.Stdin => new StdinSource(kinesisEnrichConfig, igluResolver, registry, tracker)
   }
 
-  val shredSource = kinesisEnrichConfig.source match {
-    case Source.Kafka => new KafkaSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-    case Source.Kinesis => new KinesisEnrichedSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-    case Source.Stdin => new StdinSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-  }
+//  val shredSource = kinesisEnrichConfig.source match {
+//    case Source.Kafka => new KafkaSource(kinesisEnrichConfig, igluResolver, registry, tracker)
+//    case Source.Kinesis => new KinesisEnrichedSource(kinesisEnrichConfig, igluResolver, registry, tracker)
+//    case Source.Stdin => new StdinSource(kinesisEnrichConfig, igluResolver, registry, tracker)
+//  }
 
   tracker match {
     case Some(t) => SnowplowTracking.initializeSnowplowTracking(t)
@@ -192,7 +192,7 @@ object KinesisEnrichApp extends App {
   }
 
   source.run
-  shredSource.run
+ // shredSource.run
 
   /**
    * Return a JSON string based on the resolver argument

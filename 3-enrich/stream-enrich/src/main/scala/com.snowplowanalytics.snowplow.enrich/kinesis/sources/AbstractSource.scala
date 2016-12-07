@@ -294,6 +294,10 @@ abstract class AbstractSource(config: KinesisEnrichConfig, igluResolver: Resolve
 
   def storeAlteredAtomicEvents(originalEvents: List[String]): Boolean = {
 
+    val test = originalEvents.map(EnrichedEventLoader.toEnrichedEvent)
+
+    println(test)
+
     val altered = originalEvents.map(ShredJob.alterEnrichedEvent)
     val alteredWithPartitionKey = altered.map {
       event =>

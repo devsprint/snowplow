@@ -16,18 +16,20 @@
  * See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics.snowplow.enrich
-package kinesis
+package com.snowplowanalytics.snowplow.enrich.kinesis
 
 // Java
 import java.io.File
 import java.net.URI
 
+import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
+import com.snowplowanalytics.snowplow.enrich.common.utils.JsonUtils
+import com.snowplowanalytics.snowplow.enrich.kinesis.sources.{KafkaSource, KinesisSource, StdinSource}
+
 // Amazon
-import com.amazonaws.services.dynamodbv2.model.ScanRequest
-import com.amazonaws.services.dynamodbv2.model.AttributeValue
-import com.amazonaws.services.dynamodbv2.document.DynamoDB
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClient
+import com.amazonaws.services.dynamodbv2.document.DynamoDB
+import com.amazonaws.services.dynamodbv2.model.{AttributeValue, ScanRequest}
 import com.amazonaws.services.s3.AmazonS3Client
 import com.amazonaws.services.s3.model.GetObjectRequest
 
@@ -35,35 +37,27 @@ import com.amazonaws.services.s3.model.GetObjectRequest
 import org.slf4j.LoggerFactory
 
 // Scala
-import sys.process._
-import scala.collection.JavaConverters._
 import scala.annotation.tailrec
+import scala.collection.JavaConverters._
+import scala.sys.process._
 
 // Config
-import com.typesafe.config.{
-  Config,
-  ConfigFactory
-}
+import com.typesafe.config.{Config, ConfigFactory}
 
 // Argot
 import org.clapper.argot.ArgotParser
 
 // Scalaz
-import scalaz.{Sink => _, _}
-import Scalaz._
+import scalaz.Scalaz._
 
 // json4s
-import org.json4s.jackson.JsonMethods._
 import org.json4s.JsonDSL._
+import org.json4s.jackson.JsonMethods._
 
 // Iglu
 import com.snowplowanalytics.iglu.client.Resolver
 
 // Snowplow
-import common.enrichments.EnrichmentRegistry
-import common.utils.JsonUtils
-import sources._
-import sinks._
 
 /**
  * The main entry point for Stream Enrich.
@@ -71,7 +65,7 @@ import sinks._
 object KinesisEnrichApp extends App {
 
   lazy val log = LoggerFactory.getLogger(getClass())
-  import log.{error, debug, info, trace}
+  import log.{error, info}
 
   val FilepathRegex = "^file:(.+)$".r
   val DynamoDBRegex = "^dynamodb:([^/]*)/([^/]*)/([^/]*)$".r
@@ -121,8 +115,8 @@ object KinesisEnrichApp extends App {
 
   val tracker = if (parsedConfig.hasPath("enrich.monitoring.snowplow")) {
     SnowplowTracking.initializeTracker(parsedConfig.getConfig("enrich.monitoring.snowplow")).some
-  } else { 
-    None 
+  } else {
+    None
   }
 
   val nonOptionalResolver = resolverOption.value.getOrElse(parser.usage("--resolver argument must be provided"))
@@ -180,19 +174,13 @@ object KinesisEnrichApp extends App {
     case Source.Stdin => new StdinSource(kinesisEnrichConfig, igluResolver, registry, tracker)
   }
 
-//  val shredSource = kinesisEnrichConfig.source match {
-//    case Source.Kafka => new KafkaSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-//    case Source.Kinesis => new KinesisEnrichedSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-//    case Source.Stdin => new StdinSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-//  }
-
   tracker match {
     case Some(t) => SnowplowTracking.initializeSnowplowTracking(t)
     case None    => None
   }
 
+
   source.run
- // shredSource.run
 
   /**
    * Return a JSON string based on the resolver argument
@@ -321,72 +309,4 @@ object KinesisEnrichApp extends App {
       }
     }
   }
-}
-
-// Rigidly load the configuration file here to error when
-// the enrichment process starts rather than later.
-class KinesisEnrichConfig(config: Config) {
-  private val enrich = config.resolve.getConfig("enrich")
-
-  val source = enrich.getString("source") match {
-    case "kafka" => Source.Kafka
-    case "kinesis" => Source.Kinesis
-    case "stdin" => Source.Stdin
-    case "test" => Source.Test
-    case _ => throw new RuntimeException("enrich.source unknown.")
-  }
-
-  val sink = enrich.getString("sink") match {
-    case "kafka" => Sink.Kafka
-    case "kinesis" => Sink.Kinesis
-    case "stdouterr" => Sink.Stdouterr
-    case "test" => Sink.Test
-    case _ => throw new RuntimeException("enrich.sink unknown.")
-  }
-
-  private val aws = enrich.getConfig("aws")
-  val accessKey = aws.getString("access-key")
-  val secretKey = aws.getString("secret-key")
-
-  private val kafka = enrich.getConfig("kafka")
-  val kafkaBrokers = kafka.getString("brokers")
-
-  private val streams = enrich.getConfig("streams")
-
-  private val inStreams = streams.getConfig("in")
-  val rawInStream = inStreams.getString("raw")
-
-  private val outStreams = streams.getConfig("out")
-  val enrichedOutStream = outStreams.getString("enriched")
-  val badOutStream = outStreams.getString("bad")
-
-  private val outShredStreams = streams.getConfig("shred-out")
-  val shredOutStream = outShredStreams.getString("shredded")
-  val badShredOutStream = outShredStreams.getString("bad")
-
-  val appName = streams.getString("app-name")
-
-  val initialPosition = streams.getString("initial-position")
-
-  val streamRegion = streams.getString("region")
-  val streamEndpoint = s"https://kinesis.${streamRegion}.amazonaws.com"
-
-  val maxRecords = if (inStreams.hasPath("maxRecords")) {
-    inStreams.getInt("maxRecords")
-  } else {
-    10000
-  }
-
-  val buffer = inStreams.getConfig("buffer")
-  val byteLimit = buffer.getInt("byte-limit")
-  val recordLimit = buffer.getInt("record-limit")
-  val timeLimit = buffer.getInt("time-limit")
-
-  val credentialsProvider = CredentialsLookup.getCredentialsProvider(accessKey, secretKey)
-
-  val backoffPolicy = outStreams.getConfig("backoffPolicy")
-  val minBackoff = backoffPolicy.getLong("minBackoff")
-  val maxBackoff = backoffPolicy.getLong("maxBackoff")
-
-  val useIpAddressAsPartitionKey = outStreams.hasPath("useIpAddressAsPartitionKey") && outStreams.getBoolean("useIpAddressAsPartitionKey")
 }

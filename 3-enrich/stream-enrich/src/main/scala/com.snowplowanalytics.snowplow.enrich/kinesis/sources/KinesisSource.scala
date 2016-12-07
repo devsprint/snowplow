@@ -16,24 +16,20 @@
  * See the Apache License Version 2.0 for the specific language
  * governing permissions and limitations there under.
  */
-package com.snowplowanalytics
-package snowplow
-package enrich
-package kinesis
-package sources
+package com.snowplowanalytics.snowplow.enrich.kinesis.sources
 
 // Java
-import java.io.{FileInputStream,IOException}
 import java.net.InetAddress
-import java.nio.ByteBuffer
-import java.util.{List,UUID}
+import java.util.{List, UUID}
+
+import com.snowplowanalytics.iglu.client.Resolver
+import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
+import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisEnrichConfig
+import com.snowplowanalytics.snowplow.enrich.kinesis.sinks.ISink
 
 // Amazon
-import com.amazonaws.auth._
-import com.amazonaws.AmazonClientException
-import com.amazonaws.services.kinesis.AmazonKinesisClient
-import com.amazonaws.services.kinesis.clientlibrary.interfaces._
 import com.amazonaws.services.kinesis.clientlibrary.exceptions._
+import com.amazonaws.services.kinesis.clientlibrary.interfaces._
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker._
 import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason
 import com.amazonaws.services.kinesis.model.Record
@@ -42,25 +38,16 @@ import com.amazonaws.services.kinesis.model.Record
 import org.slf4j.LoggerFactory
 
 // Scala
-import scala.util.control.Breaks._
 import scala.collection.JavaConversions._
+import scala.util.control.Breaks._
 import scala.util.control.NonFatal
 
 // Thrift
 import org.apache.thrift.TDeserializer
 
 // Iglu
-import iglu.client.Resolver
 
 // Snowplow events and enrichment
-import common.enrichments.EnrichmentRegistry
-import sinks._
-import collectors.thrift.{
-  SnowplowRawEvent,
-  TrackerPayload => ThriftTrackerPayload,
-  PayloadProtocol,
-  PayloadFormat
-}
 
 // Tracker
 import com.snowplowanalytics.snowplow.scalatracker.Tracker
@@ -72,7 +59,7 @@ class KinesisSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichm
     extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
   
   lazy val log = LoggerFactory.getLogger(getClass())
-  import log.{error, debug, info, trace}
+  import log.{error, info}
 
   /**
    * Never-ending processing loop over source stream.
@@ -155,7 +142,6 @@ class KinesisSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichm
     private def processRecordsWithRetries(records: List[Record]): Boolean = {
       try {
         enrichAndStoreEvents(records.map(_.getData.array).toList)
-        storeAlteredAtomicEvents(records.map(_.getData.array).map(t => new String(t)).toList)
       } catch {
         case NonFatal(e) =>
           // TODO: send an event when something goes wrong here

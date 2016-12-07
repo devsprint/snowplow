@@ -10,6 +10,7 @@
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the Apache License Version 2.0 for the specific language governing permissions and limitations there under.
  */
+
 import sbt._
 import Keys._
 
@@ -23,9 +24,8 @@ object SnowplowStreamEnrichBuild extends Build {
     shellPrompt := { s => Project.extract(s).currentProject.id + " > " }
   }
 
-  // Define our project, with basic project information and library dependencies
-  lazy val project = Project("snowplow-stream-enrich", file("."))
-    .settings(buildSettings: _*)
+  lazy val common = Project("common", file("common"))
+    .settings(basicSettings ++ scalifySettings: _*)
     .settings(
       libraryDependencies ++= Seq(
         Libraries.logging,
@@ -53,4 +53,13 @@ object SnowplowStreamEnrichBuild extends Build {
         // Add your additional libraries here (comma-separated)...
       )
     )
+
+  // Define our project, with basic project information and library dependencies
+  lazy val projectEnrich = Project("snowplow-stream-enrich", file("enrich"))
+    .settings(buildSettings: _*)
+    .dependsOn(common)
+
+  lazy val projectShred = Project("snowplow-stream-shred", file("shred"))
+    .settings(buildSettings: _*)
+      .dependsOn(common)
 }

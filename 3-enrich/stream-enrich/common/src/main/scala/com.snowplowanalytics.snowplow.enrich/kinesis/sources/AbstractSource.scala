@@ -155,7 +155,7 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
 
   protected val enrichBadSink = getThreadLocalSink(InputType.EnrichBad)
 
-  protected val shredSink = getThreadLocalSink(InputType.ShredGood)
+  protected val shredSink = getThreadLocalSink(InputType.Firehose)
 
   protected val shredBadSink = getThreadLocalSink(InputType.ShredBad)
 
@@ -172,6 +172,7 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       case Sink.Kinesis => new KinesisSink(kinesisProvider, config, inputType, tracker).some
       case Sink.Stdouterr => new StdouterrSink(inputType).some
       case Sink.Test => None
+     // case Sink.Firehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
     }
   }
 

@@ -27,7 +27,7 @@ shred {
   # 'stdouterr' for writing enriched events to stdout and invalid events to stderr.
   #    Using "sbt assembly" and "java -jar" is recommended to disable sbt
   #    logging.
-  sink = "kinesis"
+  sink = "firehose"
 
   # AWS credentials
   #

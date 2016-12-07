@@ -25,4 +25,5 @@ object InputType extends Enumeration {
   type InputType = Value
   val EnrichGood, EnrichBad = Value
   val ShredGood, ShredBad = Value
+  //val Firehose = Value
 }

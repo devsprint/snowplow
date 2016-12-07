@@ -22,6 +22,7 @@ package com.snowplowanalytics.snowplow.enrich.kinesis.sources
 import java.net.InetAddress
 import java.util.{List, UUID}
 
+import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason
 import com.snowplowanalytics.iglu.client.Resolver
 import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
 import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisConfig
@@ -31,7 +32,6 @@ import com.snowplowanalytics.snowplow.enrich.kinesis.sinks.ISink
 import com.amazonaws.services.kinesis.clientlibrary.exceptions._
 import com.amazonaws.services.kinesis.clientlibrary.interfaces._
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker._
-import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason
 import com.amazonaws.services.kinesis.model.Record
 
 // Logging

@@ -24,6 +24,8 @@ object SnowplowStreamEnrichBuild extends Build {
     shellPrompt := { s => Project.extract(s).currentProject.id + " > " }
   }
 
+  lazy val root = Project("snowplow-stream-enrich-shred", file(".")).aggregate(common, projectEnrich, projectShred)
+
   lazy val common = Project("common", file("common"))
     .settings(basicSettings ++ scalifySettings: _*)
     .settings(
@@ -56,10 +58,10 @@ object SnowplowStreamEnrichBuild extends Build {
 
   // Define our project, with basic project information and library dependencies
   lazy val projectEnrich = Project("snowplow-stream-enrich", file("enrich"))
-    .settings(buildSettings: _*)
+    .settings(basicSettings ++ sbtAssemblySettings: _*)
     .dependsOn(common)
 
   lazy val projectShred = Project("snowplow-stream-shred", file("shred"))
-    .settings(buildSettings: _*)
-      .dependsOn(common)
+    .settings(basicSettings ++ sbtAssemblySettings: _*)
+    .dependsOn(common)
 }

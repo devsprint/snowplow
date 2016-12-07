@@ -155,7 +155,7 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
 
   protected val enrichBadSink = getThreadLocalSink(InputType.EnrichBad)
 
-  protected val shredSink = getThreadLocalSink(InputType.Firehose)
+  protected val shredSink = getThreadLocalSink(InputType.ShredGood)
 
   protected val shredBadSink = getThreadLocalSink(InputType.ShredBad)
 

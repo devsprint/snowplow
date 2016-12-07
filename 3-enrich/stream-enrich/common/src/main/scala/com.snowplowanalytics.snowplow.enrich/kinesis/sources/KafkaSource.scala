@@ -47,7 +47,7 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 /**
  * Source to read events from a Kafka topic
  */
-class KafkaSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
+class KafkaSource(config: KinesisConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
     extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
 
   lazy val log = LoggerFactory.getLogger(getClass())
@@ -78,12 +78,12 @@ class KafkaSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichmen
     }
   }
 
-  private def createConsumer(config: KinesisEnrichConfig): KafkaConsumer[String, Array[Byte]] = {
+  private def createConsumer(config: KinesisConfig): KafkaConsumer[String, Array[Byte]] = {
     val properties = createProperties(config)
     new KafkaConsumer[String, Array[Byte]](properties)
   }
 
-  private def createProperties(config: KinesisEnrichConfig): Properties = {
+  private def createProperties(config: KinesisConfig): Properties = {
 
     val props = new Properties()
     props.put("bootstrap.servers", config.kafkaBrokers)

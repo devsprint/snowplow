@@ -7,10 +7,9 @@ import com.typesafe.config.Config
   */
 // Rigidly load the configuration file here to error when
 // the enrichment process starts rather than later.
-class KinesisEnrichConfig(config: Config) {
-  private val enrich = config.resolve.getConfig("enrich")
+class KinesisConfig(config: Config) {
 
-  val source = enrich.getString("source") match {
+  val source = config.getString("source") match {
     case "kafka" => Source.Kafka
     case "kinesis" => Source.Kinesis
     case "stdin" => Source.Stdin
@@ -18,7 +17,7 @@ class KinesisEnrichConfig(config: Config) {
     case _ => throw new RuntimeException("enrich.source unknown.")
   }
 
-  val sink = enrich.getString("sink") match {
+  val sink = config.getString("sink") match {
     case "kafka" => Sink.Kafka
     case "kinesis" => Sink.Kinesis
     case "stdouterr" => Sink.Stdouterr
@@ -26,14 +25,14 @@ class KinesisEnrichConfig(config: Config) {
     case _ => throw new RuntimeException("enrich.sink unknown.")
   }
 
-  private val aws = enrich.getConfig("aws")
+  private val aws = config.getConfig("aws")
   val accessKey = aws.getString("access-key")
   val secretKey = aws.getString("secret-key")
 
-  private val kafka = enrich.getConfig("kafka")
+  private val kafka = config.getConfig("kafka")
   val kafkaBrokers = kafka.getString("brokers")
 
-  private val streams = enrich.getConfig("streams")
+  private val streams = config.getConfig("streams")
 
   private val inStreams = streams.getConfig("in")
   val rawInStream = inStreams.getString("raw")
@@ -41,10 +40,6 @@ class KinesisEnrichConfig(config: Config) {
   private val outStreams = streams.getConfig("out")
   val enrichedOutStream = outStreams.getString("enriched")
   val badOutStream = outStreams.getString("bad")
-
-  private val outShredStreams = streams.getConfig("shred-out")
-  val shredOutStream = outShredStreams.getString("shredded")
-  val badShredOutStream = outShredStreams.getString("bad")
 
   val appName = streams.getString("app-name")
 

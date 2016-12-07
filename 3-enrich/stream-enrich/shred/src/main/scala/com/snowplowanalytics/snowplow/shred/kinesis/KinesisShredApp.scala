@@ -12,7 +12,7 @@ import com.snowplowanalytics.iglu.client.Resolver
 import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
 import com.snowplowanalytics.snowplow.enrich.common.utils.JsonUtils
 import com.snowplowanalytics.snowplow.enrich.kinesis.sources.{KafkaSource, KinesisEnrichedSource, StdinSource}
-import com.snowplowanalytics.snowplow.enrich.kinesis.{KinesisEnrichConfig, SnowplowTracking, Source, generated}
+import com.snowplowanalytics.snowplow.enrich.kinesis._
 import com.typesafe.config.{Config, ConfigFactory}
 import org.clapper.argot.ArgotParser
 import org.json4s.JsonDSL._
@@ -80,7 +80,8 @@ object KinesisShredApp extends App {
   parser.parse(args)
 
   val parsedConfig = config.value.getOrElse(parser.usage("--config argument must be provided"))
-  val kinesisEnrichConfig = new KinesisEnrichConfig(parsedConfig)
+  private val shred = parsedConfig.resolve.getConfig("shred")
+  val kinesisConfig = new KinesisConfig(shred)
 
   val tracker = if (parsedConfig.hasPath("enrich.monitoring.snowplow")) {
     SnowplowTracking.initializeTracker(parsedConfig.getConfig("enrich.monitoring.snowplow")).some
@@ -137,10 +138,10 @@ object KinesisShredApp extends App {
     }
   }
 
-  val shredSource = kinesisEnrichConfig.source match {
-    case Source.Kafka => new KafkaSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-    case Source.Kinesis => new KinesisEnrichedSource(kinesisEnrichConfig, igluResolver, registry, tracker)
-    case Source.Stdin => new StdinSource(kinesisEnrichConfig, igluResolver, registry, tracker)
+  val shredSource = kinesisConfig.source match {
+    case Source.Kafka => new KafkaSource(kinesisConfig, igluResolver, registry, tracker)
+    case Source.Kinesis => new KinesisEnrichedSource(kinesisConfig, igluResolver, registry, tracker)
+    case Source.Stdin => new StdinSource(kinesisConfig, igluResolver, registry, tracker)
   }
 
   tracker match {
@@ -180,7 +181,7 @@ object KinesisShredApp extends App {
     * @return The JSON stored in DynamoDB
     */
   def lookupDynamoDBConfig(region: String, table: String, key: String): String = {
-    val dynamoDBClient = new AmazonDynamoDBClient(kinesisEnrichConfig.credentialsProvider)
+    val dynamoDBClient = new AmazonDynamoDBClient(kinesisConfig.credentialsProvider)
     dynamoDBClient.setEndpoint(s"https://dynamodb.${region}.amazonaws.com")
     val dynamoDB = new DynamoDB(dynamoDBClient)
     val item = dynamoDB.getTable(table).getItem("id", key)
@@ -227,7 +228,7 @@ object KinesisShredApp extends App {
     * @return List of JSONs
     */
   def lookupDynamoDBEnrichments(region: String, table: String, partialKey: String): List[String] = {
-    val dynamoDBClient = new AmazonDynamoDBClient(kinesisEnrichConfig.credentialsProvider)
+    val dynamoDBClient = new AmazonDynamoDBClient(kinesisConfig.credentialsProvider)
     dynamoDBClient.setEndpoint(s"https://dynamodb.${region}.amazonaws.com")
 
     // Each scan can only return up to 1MB
@@ -263,7 +264,7 @@ object KinesisShredApp extends App {
     * @return the download result
     */
   def downloadFromS3(uri: URI, outputFile: File): Int = {
-    val s3Client = new AmazonS3Client(kinesisEnrichConfig.credentialsProvider)
+    val s3Client = new AmazonS3Client(kinesisConfig.credentialsProvider)
     val bucket = uri.getHost
     val key = uri.getPath match {
       // Need to remove leading '/'

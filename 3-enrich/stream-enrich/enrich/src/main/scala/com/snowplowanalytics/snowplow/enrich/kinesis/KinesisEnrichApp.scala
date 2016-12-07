@@ -111,7 +111,8 @@ object KinesisEnrichApp extends App {
   parser.parse(args)
 
   val parsedConfig = config.value.getOrElse(parser.usage("--config argument must be provided"))
-  val kinesisEnrichConfig = new KinesisEnrichConfig(parsedConfig)
+  private val enrich = parsedConfig.resolve.getConfig("enrich")
+  val kinesisEnrichConfig = new KinesisConfig(enrich)
 
   val tracker = if (parsedConfig.hasPath("enrich.monitoring.snowplow")) {
     SnowplowTracking.initializeTracker(parsedConfig.getConfig("enrich.monitoring.snowplow")).some

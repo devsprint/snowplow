@@ -38,7 +38,7 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 /**
  * Kafka Sink for Scala enrichment
  */
-class KafkaSink(config: KinesisEnrichConfig,
+class KafkaSink(config: KinesisConfig,
     inputType: InputType.InputType, tracker: Option[Tracker]) extends ISink {
 
   private lazy val log = LoggerFactory.getLogger(getClass())
@@ -47,8 +47,8 @@ class KafkaSink(config: KinesisEnrichConfig,
   private val topicName = inputType match {
     case InputType.EnrichGood => config.enrichedOutStream
     case InputType.EnrichBad => config.badOutStream
-    case InputType.ShredGood => config.shredOutStream
-    case InputType.ShredBad => config.badShredOutStream
+    case InputType.ShredGood => config.enrichedOutStream
+    case InputType.ShredBad => config.badOutStream
   }
 
   private val kafkaProducer = createProducer(config)
@@ -92,12 +92,12 @@ class KafkaSink(config: KinesisEnrichConfig,
   def flush() {
   }
 
-  private def createProducer(config: KinesisEnrichConfig): KafkaProducer[String, String] = {
+  private def createProducer(config: KinesisConfig): KafkaProducer[String, String] = {
     val properties = createProperties(config)
     new KafkaProducer[String, String](properties)
   }
 
-  private def createProperties(config: KinesisEnrichConfig): Properties = {
+  private def createProperties(config: KinesisConfig): Properties = {
 
     val props = new Properties()
     props.put("bootstrap.servers", config.kafkaBrokers)

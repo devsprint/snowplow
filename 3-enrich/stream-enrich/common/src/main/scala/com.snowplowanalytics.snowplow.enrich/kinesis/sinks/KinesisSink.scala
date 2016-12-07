@@ -70,15 +70,15 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
  * Kinesis Sink for Scala enrichment
  */
 class KinesisSink(provider: AWSCredentialsProvider,
-    config: KinesisEnrichConfig, inputType: InputType.InputType, tracker: Option[Tracker]) extends ISink {
+    config: KinesisConfig, inputType: InputType.InputType, tracker: Option[Tracker]) extends ISink {
   private lazy val log = LoggerFactory.getLogger(getClass())
   import log.{error, debug, info, trace}
 
   private val name = inputType match {
     case InputType.EnrichGood => config.enrichedOutStream
     case InputType.EnrichBad => config.badOutStream
-    case InputType.ShredGood => config.shredOutStream
-    case InputType.ShredBad => config.badShredOutStream
+    case InputType.ShredGood => config.enrichedOutStream
+    case InputType.ShredBad => config.badOutStream
   }
 
   private val maxBackoff = config.maxBackoff

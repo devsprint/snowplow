@@ -11,21 +11,20 @@ import com.amazonaws.services.kinesis.clientlibrary.types.ShutdownReason
 import com.amazonaws.services.kinesis.model.Record
 import com.snowplowanalytics.iglu.client.Resolver
 import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
-import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisEnrichConfig
+import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisConfig
 import com.snowplowanalytics.snowplow.enrich.kinesis.sinks.ISink
 import com.snowplowanalytics.snowplow.scalatracker.Tracker
 import org.slf4j.LoggerFactory
 
 import scala.util.control.Breaks.{break, breakable}
 import scala.util.control.NonFatal
-
 import scala.collection.JavaConversions._
 
 /**
   * Read the data from enriched stream source.
   * TODO: the implementation is very similar with the Kinesis Source - it may be refactored.
   */
-class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
+class KinesisEnrichedSource(config: KinesisConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
   extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
 
   lazy val log = LoggerFactory.getLogger(getClass())
@@ -43,7 +42,7 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
 
     val kinesisClientLibConfiguration = new KinesisClientLibConfiguration(
       config.appName,
-      config.enrichedOutStream,
+      config.rawInStream,
       kinesisProvider,
       workerId
     ).withInitialPositionInStream(
@@ -55,7 +54,7 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
       .withCallProcessRecordsEvenForEmptyRecordList(true)
 
     info(s"Running: ${config.appName}.")
-    info(s"Processing enriched input stream: ${config.enrichedOutStream}")
+    info(s"Processing enriched input stream: ${config.rawInStream}")
 
     val enrichedEventProcessorFactory = new EnrichedEventProcessorFactory(
       config,
@@ -69,13 +68,13 @@ class KinesisEnrichedSource(config: KinesisEnrichConfig, igluResolver: Resolver,
     worker.run()
   }
 
-  class EnrichedEventProcessorFactory(config: KinesisEnrichConfig, sink: ISink) extends IRecordProcessorFactory {
+  class EnrichedEventProcessorFactory(config: KinesisConfig, sink: ISink) extends IRecordProcessorFactory {
     override def createProcessor(): IRecordProcessor = {
       new EnrichedEventProcessor(config, sink)
     }
   }
 
-  class EnrichedEventProcessor(config: KinesisEnrichConfig, sink: ISink) extends IRecordProcessor {
+  class EnrichedEventProcessor(config: KinesisConfig, sink: ISink) extends IRecordProcessor {
 
     private var kinesisShardId: String = _
 

@@ -24,7 +24,7 @@ import java.util.{List, UUID}
 
 import com.snowplowanalytics.iglu.client.Resolver
 import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
-import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisEnrichConfig
+import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisConfig
 import com.snowplowanalytics.snowplow.enrich.kinesis.sinks.ISink
 
 // Amazon
@@ -55,7 +55,7 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 /**
  * Source to read events from a Kinesis stream
  */
-class KinesisSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
+class KinesisSource(config: KinesisConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
     extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
   
   lazy val log = LoggerFactory.getLogger(getClass())
@@ -99,7 +99,7 @@ class KinesisSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichm
 
   // Factory needed by the Amazon Kinesis Consumer library to
   // create a processor.
-  class RawEventProcessorFactory(config: KinesisEnrichConfig, sink: ISink)
+  class RawEventProcessorFactory(config: KinesisConfig, sink: ISink)
       extends IRecordProcessorFactory {
     @Override
     def createProcessor: IRecordProcessor = {
@@ -108,7 +108,7 @@ class KinesisSource(config: KinesisEnrichConfig, igluResolver: Resolver, enrichm
   }
 
   // Process events from a Kinesis stream.
-  class RawEventProcessor(config: KinesisEnrichConfig, sink: ISink)
+  class RawEventProcessor(config: KinesisConfig, sink: ISink)
       extends IRecordProcessor {
     private val thriftDeserializer = new TDeserializer()
 

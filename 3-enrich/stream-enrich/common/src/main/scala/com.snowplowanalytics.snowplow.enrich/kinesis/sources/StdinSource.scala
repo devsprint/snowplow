@@ -23,6 +23,8 @@ package kinesis
 package sources
 
 // Scala
+import org.slf4j.LoggerFactory
+
 import scala.io
 import scala.collection.JavaConversions._
 
@@ -45,12 +47,17 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 class StdinSource(config: KinesisConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
     extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
 
+  lazy val log = LoggerFactory.getLogger(getClass())
+  import log.info
+
+
   /**
    * Never-ending processing loop over source stream.
    */
   def run = {
     for (ln <- io.Source.stdin.getLines) {
       val bytes = Base64.decodeBase64(ln)
+      info(s"Data: $bytes")
       enrichAndStoreEvents(List(bytes))
     }
   }

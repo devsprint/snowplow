@@ -27,6 +27,7 @@ import com.snowplowanalytics.iglu.client.Resolver
 import com.snowplowanalytics.snowplow.enrich.common.enrichments.EnrichmentRegistry
 import com.snowplowanalytics.snowplow.enrich.kinesis.KinesisConfig
 import com.snowplowanalytics.snowplow.enrich.kinesis.sinks.ISink
+import org.slf4j.Logger
 
 // Amazon
 import com.amazonaws.services.kinesis.clientlibrary.exceptions._
@@ -58,7 +59,7 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 class KinesisSource(config: KinesisConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
     extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
   
-  lazy val log = LoggerFactory.getLogger(getClass())
+  lazy val log: Logger = LoggerFactory.getLogger(getClass())
   import log.{error, info}
 
   /**

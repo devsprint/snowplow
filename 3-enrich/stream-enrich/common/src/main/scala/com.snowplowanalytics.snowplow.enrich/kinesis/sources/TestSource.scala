@@ -23,6 +23,7 @@ package sources
 
 // Iglu
 import iglu.client.Resolver
+import org.slf4j.LoggerFactory
 
 // Snowplow
 import common.enrichments.EnrichmentRegistry
@@ -38,11 +39,16 @@ import com.snowplowanalytics.snowplow.scalatracker.Tracker
 class TestSource(config: KinesisConfig, igluResolver: Resolver, enrichmentRegistry: EnrichmentRegistry, tracker: Option[Tracker])
     extends AbstractSource(config, igluResolver, enrichmentRegistry, tracker) {
 
+  lazy val log = LoggerFactory.getLogger(getClass())
+  import log.info
+
+
   /**
    * Never-ending processing loop over source stream.
    * Not supported for TestSource.
    */
   def run = {
+    info("Test source in action.")
     throw new RuntimeException("run() should not be called on TestSource")
   }
 }

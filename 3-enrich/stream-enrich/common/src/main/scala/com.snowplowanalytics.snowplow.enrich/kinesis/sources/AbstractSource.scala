@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.snowplowanalytics.iglu.client.{ProcessingMessageNel, SchemaKey}
 import com.snowplowanalytics.snowplow.enrich.common.{JsonSchemaPairs, ValidatedEnrichedEvent}
 import com.snowplowanalytics.snowplow.enrich.common.loaders.{CollectorPayload, TsvLoader}
+import org.slf4j.Logger
 
 import scala.collection.immutable.Seq
 
@@ -59,7 +60,6 @@ import org.joda.time.DateTime
 
 // Iglu
 import iglu.client.Resolver
-import iglu.client.validation.ProcessingMessageMethods._
 
 // Snowplow
 import sinks._
@@ -69,13 +69,10 @@ BadRow
 }
 import common.loaders.ThriftLoader
 import common.enrichments.EnrichmentRegistry
-import common.enrichments.EnrichmentManager
-import common.enrichments.EventEnrichments
-import common.adapters.AdapterRegistry
 
 import common.ValidatedMaybeCollectorPayload
 import common.EtlPipeline
-import common.utils.JsonUtils
+
 
 // Tracker
 import com.snowplowanalytics.snowplow.scalatracker.Tracker
@@ -135,6 +132,9 @@ object AbstractSource {
 abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
                               enrichmentRegistry: EnrichmentRegistry,
                               tracker: Option[Tracker]) {
+
+  val log: Logger
+  import log.{error, info}
 
   val MaxRecordSize = if (config.sink == Sink.Kinesis) {
     Some(MaxBytes)
@@ -262,7 +262,7 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
   }
 
   /**
-    * Shread means that we will retrive all json fields from atomic.events, validate them and stored in derived topic.
+    * Shread means that we will retrieve all json fields from atomic.events, validate them and stored in derived topic.
     * The original atomic event will be updated to not include json fields.
     *
     * @param events
@@ -315,11 +315,12 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
     } yield AbstractSource.oversizedSuccessToFailure(value, m) -> key
 
     val successesTriggeredFlush = firehoseSink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
-    val failuresTriggeredFlush = shredBadSink.get.map(_.storeEnrichedEvents(sizeBasedFailures))
+    if (sizeBasedFailures.nonEmpty) {
+      error(s"Too large records: $sizeBasedFailures")
+    }
 
-    if (successesTriggeredFlush == Some(true) || failuresTriggeredFlush == Some(true)) {
+    if (successesTriggeredFlush == Some(true)) {
       firehoseSink.get.foreach(_.flush())
-      shredBadSink.get.foreach(_.flush())
       true
     } else {
       false

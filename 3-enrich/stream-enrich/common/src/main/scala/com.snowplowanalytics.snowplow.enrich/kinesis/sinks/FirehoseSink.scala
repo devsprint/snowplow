@@ -26,7 +26,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 
 import com.amazonaws.auth.AWSCredentialsProvider
 import com.amazonaws.services.kinesisfirehose.AmazonKinesisFirehoseClient
-import com.amazonaws.services.kinesisfirehose.model.{PutRecordBatchRequest, PutRecordBatchResponseEntry, PutRecordBatchResult, Record}
+import com.amazonaws.services.kinesisfirehose.model._
 import com.snowplowanalytics.snowplow.scalatracker.Tracker
 import org.slf4j.LoggerFactory
 
@@ -55,7 +55,22 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
   private val minBackoff = config.minBackoff
   private val randomGenerator = new java.util.Random()
 
-  val client = new AmazonKinesisFirehoseClient(provider)
+  val client = {
+    val firehose = new AmazonKinesisFirehoseClient(provider)
+    val deliveryStreamRequest = new DescribeDeliveryStreamRequest()
+      .withDeliveryStreamName(name)
+
+    val response = firehose.describeDeliveryStream(deliveryStreamRequest)
+    info(s"Firehose describe response: ${response}")
+    val status =  response.getDeliveryStreamDescription.getDeliveryStreamStatus
+    if (status.toLowerCase != "active") {
+      error(s"Cannot write because firehose delivery stream with name $name  is not active")
+      System.exit(1)
+      throw new RuntimeException("System.exit should never fail")
+    }
+
+    firehose
+  }
 
   val ByteThreshold = config.byteLimit
   val RecordThreshold = config.recordLimit

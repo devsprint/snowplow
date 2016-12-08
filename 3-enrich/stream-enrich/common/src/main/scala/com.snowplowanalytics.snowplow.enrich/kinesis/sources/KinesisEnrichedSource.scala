@@ -58,7 +58,7 @@ class KinesisEnrichedSource(config: KinesisConfig, igluResolver: Resolver, enric
 
     val enrichedEventProcessorFactory = new EnrichedEventProcessorFactory(
       config,
-      shredSink.get.get // TODO: yech, yech
+      firehoseSink.get.get // TODO: yech, yech
     )
     val worker = new Worker(
       enrichedEventProcessorFactory,
@@ -109,7 +109,6 @@ class KinesisEnrichedSource(config: KinesisConfig, igluResolver: Resolver, enric
 
     private def processRecordsWithRetries(records: List[Record]): Boolean = {
       try {
-        // TODO: from an enriched event to shred.
         val events = records.map(_.getData.array).map(t => new String(t)).toList
         storeAlteredAtomicEvents(events)
         // TODO: the derivated data should go into a different stream.

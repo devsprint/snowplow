@@ -22,6 +22,7 @@ class KinesisConfig(config: Config) {
     case "kinesis" => Sink.Kinesis
     case "stdouterr" => Sink.Stdouterr
     case "test" => Sink.Test
+    case "firehose" => Sink.Firehose
     case _ => throw new RuntimeException("enrich.sink unknown.")
   }
 

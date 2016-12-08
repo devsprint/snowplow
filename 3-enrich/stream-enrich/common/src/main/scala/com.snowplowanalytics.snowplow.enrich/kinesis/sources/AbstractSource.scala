@@ -159,6 +159,8 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
 
   protected val shredBadSink = getThreadLocalSink(InputType.ShredBad)
 
+  protected val firehoseSink = getThreadLocalSink(InputType.Firehose)
+
   /**
     * We need the sink to be ThreadLocal as otherwise a single copy
     * will be shared between threads for different shards
@@ -172,7 +174,7 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       case Sink.Kinesis => new KinesisSink(kinesisProvider, config, inputType, tracker).some
       case Sink.Stdouterr => new StdouterrSink(inputType).some
       case Sink.Test => None
-     // case Sink.Firehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
+      case Sink.Firehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
     }
   }
 
@@ -312,11 +314,11 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       m <- MaxRecordSize
     } yield AbstractSource.oversizedSuccessToFailure(value, m) -> key
 
-    val successesTriggeredFlush = shredSink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
+    val successesTriggeredFlush = firehoseSink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
     val failuresTriggeredFlush = shredBadSink.get.map(_.storeEnrichedEvents(sizeBasedFailures))
 
     if (successesTriggeredFlush == Some(true) || failuresTriggeredFlush == Some(true)) {
-      shredSink.get.foreach(_.flush())
+      firehoseSink.get.foreach(_.flush())
       shredBadSink.get.foreach(_.flush())
       true
     } else {

@@ -137,7 +137,8 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
     * is implemented.
     */
   override def storeEnrichedEvents(events: List[(String, String)]): Boolean = {
-    val wrappedEvents = events.map(e => ByteBuffer.wrap(e._1.getBytes(UTF_8)) -> e._2)
+    debug(s"Trying to store events to firehose: \n $events")
+    val wrappedEvents = events.map(e => ByteBuffer.wrap(s"${e._1}\n".getBytes(UTF_8)) -> e._2)
     wrappedEvents.foreach(FirehoseEventStorage.addEvent(_))
 
     // Log BadRows
@@ -146,6 +147,7 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
       case InputType.EnrichBad => events.foreach(e => debug(s"BadRow: ${e._1}"))
       case InputType.ShredGood => None
       case InputType.ShredBad => events.foreach(e => debug(s"BadRow: ${e._1}"))
+      case InputType.Firehose => None
     }
 
     if (FirehoseEventStorage.currentBatch.nonEmpty && System.currentTimeMillis() > nextRequestTime) {

@@ -111,8 +111,7 @@ class KinesisEnrichedSource(config: KinesisConfig, igluResolver: Resolver, enric
       try {
         val events = records.map(_.getData.array).map(t => new String(t)).toList
         storeAlteredAtomicEvents(events)
-        // TODO: the derivated data should go into a different stream.
-        //shredAndStoreEvents(events)
+        shredAndStoreEvents(events)
         true
       } catch {
         case NonFatal(e) =>

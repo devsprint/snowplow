@@ -25,5 +25,7 @@ object InputType extends Enumeration {
   type InputType = Value
   val EnrichGood, EnrichBad = Value
   val ShredGood, ShredBad = Value
-  val Firehose = Value
+  val Firehose = Value     // push raw data (events) to Amazon Kinesis Firehose
+  val UAFirehose = Value  // push json data (events) to Amazon Kinesis Firehose
+  val PerformanceFirehose = Value // push json data to Amazon Kinesis Firehose
 }

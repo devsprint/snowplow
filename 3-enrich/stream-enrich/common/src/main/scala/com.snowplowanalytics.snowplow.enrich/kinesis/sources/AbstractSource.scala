@@ -134,7 +134,8 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
                               tracker: Option[Tracker]) {
 
   val log: Logger
-  import log.{error, info}
+
+  import log.{error, info, debug}
 
   val MaxRecordSize = if (config.sink == Sink.Kinesis) {
     Some(MaxBytes)
@@ -161,6 +162,13 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
 
   protected val firehoseSink = getThreadLocalSink(InputType.Firehose)
 
+  protected val uaFirehoseSink = getThreadLocalSink(InputType.UAFirehose)
+
+  protected val performanceFirehoseSink = getThreadLocalSink(InputType.PerformanceFirehose)
+
+  private val UA_PARSER_CONTEXT = "ua_parser_context"
+  private val PERFORMANCE_TIMING_CONTEXT = "PerformanceTiming"
+
   /**
     * We need the sink to be ThreadLocal as otherwise a single copy
     * will be shared between threads for different shards
@@ -175,6 +183,8 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       case Sink.Stdouterr => new StdouterrSink(inputType).some
       case Sink.Test => None
       case Sink.Firehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
+      case Sink.UAFirehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
+      case Sink.PerformanceFirehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
     }
   }
 
@@ -249,6 +259,8 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
 
     val successesTriggeredFlush = enrichSink.get.map(_.storeEnrichedEvents(smallEnoughSuccesses))
     val failuresTriggeredFlush = enrichBadSink.get.map(_.storeEnrichedEvents(failures ++ sizeBasedFailures))
+    error(s"Enrich errors: $failures")
+    error(s"Enrich size based errors: $sizeBasedFailures")
     if (successesTriggeredFlush == Some(true) || failuresTriggeredFlush == Some(true)) {
 
       // Block until the records have been sent to Kinesis
@@ -278,17 +290,21 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       ShredJob.projectBads(o)
     }
 
+    info(s"Derived Data errors: $bad")
+
     val errors = shredBadSink.get().map(_.storeEnrichedEvents(bad.map(t => (t.toString(), "1")).toList))
 
     val good: Seq[(String, String, JsonSchemaPairs)] = common.flatMap { o: ValidatedNel[EventComponents] =>
       ShredJob.projectGoods(o)
     }
 
-    val goodPairs = good.flatMap(t => t._3).map(t => (t._1.name, t._2.asText())).toList
-    val jsons = shredSink.get().map(_.storeEnrichedEvents(goodPairs))
-    if (errors == Some(true) || jsons == Some(true)) {
-      shredSink.get().foreach(_.flush())
-      shredBadSink.get().foreach(_.flush())
+    val goodPairs = good.flatMap(t => t._3).map(t => (t._1.name, t._2.toString)).toList
+    info(s"Derived Data jsons: $goodPairs")
+    val uaContextErrors = uaFirehoseSink.get().map(_.storeEnrichedEvents(goodPairs.filter(_._1 == UA_PARSER_CONTEXT)))
+    val performanceContextErrors = performanceFirehoseSink.get().map(_.storeEnrichedEvents(goodPairs.filter(_._1 == PERFORMANCE_TIMING_CONTEXT)))
+    if (uaContextErrors == Some(true) || performanceContextErrors == Some(true)) {
+      uaFirehoseSink.get.foreach(_.flush())
+      performanceFirehoseSink.get().foreach(_.flush())
       true
     } else {
       false

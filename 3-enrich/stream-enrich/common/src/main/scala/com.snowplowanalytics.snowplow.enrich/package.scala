@@ -43,7 +43,7 @@ package object kinesis {
 
   object Sink extends Enumeration {
     type Sink = Value
-    val Kafka, Kinesis, Stdouterr, Test, Firehose = Value
+    val Kafka, Kinesis, Stdouterr, Test, Firehose, UAFirehose, PerformanceFirehose = Value
   }
 
   type Validated[A] = Validation[ProcessingMessage, A]

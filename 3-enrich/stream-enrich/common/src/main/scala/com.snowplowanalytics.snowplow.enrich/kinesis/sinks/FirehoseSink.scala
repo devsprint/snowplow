@@ -44,25 +44,24 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
   import log.{error, debug, info, trace}
 
   private val name = inputType match {
-    case InputType.EnrichGood => config.enrichedOutStream
-    case InputType.EnrichBad => config.badOutStream
-    case InputType.ShredGood => config.enrichedOutStream
-    case InputType.ShredBad => config.badOutStream
-    case InputType.Firehose => "snowplow"
+    case InputType.Firehose => Some("snowplow")
+    case InputType.UAFirehose => Some("snowplow-ua-paarser")
+    case InputType.PerformanceFirehose => Some("snowplow-performance")
+    case _ => None
   }
 
   private val maxBackoff = config.maxBackoff
   private val minBackoff = config.minBackoff
   private val randomGenerator = new java.util.Random()
 
-  val client = {
+  val client = name.map { firehoseName =>
     val firehose = new AmazonKinesisFirehoseClient(provider)
     val deliveryStreamRequest = new DescribeDeliveryStreamRequest()
-      .withDeliveryStreamName(name)
+      .withDeliveryStreamName(firehoseName)
 
     val response = firehose.describeDeliveryStream(deliveryStreamRequest)
     info(s"Firehose describe response: ${response}")
-    val status =  response.getDeliveryStreamDescription.getDeliveryStreamStatus
+    val status = response.getDeliveryStreamDescription.getDeliveryStreamStatus
     if (status.toLowerCase != "active") {
       error(s"Cannot write because firehose delivery stream with name $name  is not active")
       System.exit(1)
@@ -187,62 +186,64 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
     * @param batch Events to send
     */
   def sendBatch(batch: List[(ByteBuffer, String)]) {
-    if (!batch.isEmpty) {
-      info(s"Writing ${batch.size} records to Kinesis Firehose $name")
-      var unsentRecords = batch
-      var backoffTime = minBackoff
-      var sentBatchSuccessfully = false
-      var attemptNumber = 0
-      while (!sentBatchSuccessfully) {
-        attemptNumber += 1
+    client.foreach { firehoseClient =>
+      if (!batch.isEmpty) {
+        info(s"Writing ${batch.size} records to Kinesis Firehose $name")
+        var unsentRecords = batch
+        var backoffTime = minBackoff
+        var sentBatchSuccessfully = false
+        var attemptNumber = 0
+        while (!sentBatchSuccessfully) {
+          attemptNumber += 1
 
-        val firehoseRecords = unsentRecords.map { r =>
-          new Record().withData(r._1)
-        }
-
-        val firehoseBatch =
-          new PutRecordBatchRequest().withDeliveryStreamName(name).withRecords(firehoseRecords.asJava)
-
-        try {
-          //TODO: need to make it async.
-          val results = client.putRecordBatch(firehoseBatch).getRequestResponses.asScala.toList
-          val failurePairs = unsentRecords zip results filter {
-            _._2.getErrorMessage != null
+          val firehoseRecords = unsentRecords.map { r =>
+            new Record().withData(r._1)
           }
-          info(s"Successfully wrote ${unsentRecords.size - failurePairs.size} out of ${unsentRecords.size} records")
-          if (failurePairs.nonEmpty) {
-            val (failedRecords, failedResults) = failurePairs.unzip
-            unsentRecords = failedRecords
-            logErrorsSummary(getErrorsSummary(failedResults))
-            backoffTime = getNextBackoff(backoffTime)
-            error(s"Retrying all failed records in $backoffTime milliseconds...")
 
-            val err = s"Failed to send ${failurePairs.size} events"
-            val putSize: Long = unsentRecords.foldLeft(0)((a, b) => a + b._1.capacity)
+          val firehoseBatch =
+            new PutRecordBatchRequest().withDeliveryStreamName(name.get).withRecords(firehoseRecords.asJava)
 
-            tracker match {
-              case Some(t) => SnowplowTracking.sendFailureEvent(t, "PUT Failure", err, name, "snowplow-stream-shred", attemptNumber, putSize)
-              case _ => None
+          try {
+            //TODO: need to make it async.
+            val results = firehoseClient.putRecordBatch(firehoseBatch).getRequestResponses.asScala.toList
+            val failurePairs = unsentRecords zip results filter {
+              _._2.getErrorMessage != null
             }
+            info(s"Successfully wrote ${unsentRecords.size - failurePairs.size} out of ${unsentRecords.size} records")
+            if (failurePairs.nonEmpty) {
+              val (failedRecords, failedResults) = failurePairs.unzip
+              unsentRecords = failedRecords
+              logErrorsSummary(getErrorsSummary(failedResults))
+              backoffTime = getNextBackoff(backoffTime)
+              error(s"Retrying all failed records in $backoffTime milliseconds...")
 
-            Thread.sleep(backoffTime)
-          } else {
-            sentBatchSuccessfully = true
-          }
-        } catch {
-          case NonFatal(f) => {
-            backoffTime = getNextBackoff(backoffTime)
-            error(s"Writing failed.", f)
-            error(s"  + Retrying in $backoffTime milliseconds...")
+              val err = s"Failed to send ${failurePairs.size} events"
+              val putSize: Long = unsentRecords.foldLeft(0)((a, b) => a + b._1.capacity)
 
-            val putSize: Long = unsentRecords.foldLeft(0)((a, b) => a + b._1.capacity)
+              tracker match {
+                case Some(t) => SnowplowTracking.sendFailureEvent(t, "PUT Failure", err, name.get, "snowplow-stream-shred", attemptNumber, putSize)
+                case _ => None
+              }
 
-            tracker match {
-              case Some(t) => SnowplowTracking.sendFailureEvent(t, "PUT Failure", f.toString, name, "snowplow-stream-shred", attemptNumber, putSize)
-              case _ => None
+              Thread.sleep(backoffTime)
+            } else {
+              sentBatchSuccessfully = true
             }
+          } catch {
+            case NonFatal(f) => {
+              backoffTime = getNextBackoff(backoffTime)
+              error(s"Writing failed.", f)
+              error(s"  + Retrying in $backoffTime milliseconds...")
 
-            Thread.sleep(backoffTime)
+              val putSize: Long = unsentRecords.foldLeft(0)((a, b) => a + b._1.capacity)
+
+              tracker match {
+                case Some(t) => SnowplowTracking.sendFailureEvent(t, "PUT Failure", f.toString, name.get, "snowplow-stream-shred", attemptNumber, putSize)
+                case _ => None
+              }
+
+              Thread.sleep(backoffTime)
+            }
           }
         }
       }

@@ -183,8 +183,8 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       case Sink.Stdouterr => new StdouterrSink(inputType).some
       case Sink.Test => None
       case Sink.Firehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
-      case Sink.UAFirehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
-      case Sink.PerformanceFirehose => new FirehoseSink(kinesisProvider, config, inputType, tracker).some
+      case Sink.UAFirehose => new FirehoseSink(kinesisProvider, config, InputType.UAFirehose, tracker).some
+      case Sink.PerformanceFirehose => new FirehoseSink(kinesisProvider, config, InputType.PerformanceFirehose, tracker).some
     }
   }
 
@@ -298,10 +298,10 @@ abstract class AbstractSource(config: KinesisConfig, igluResolver: Resolver,
       ShredJob.projectGoods(o)
     }
 
-    val goodPairs = good.flatMap(t => t._3).map(t => (t._1.name, t._2.toString)).toList
+    val goodPairs = good.flatMap(t => t._3).map(t => (t._2.toString, t._1.name)).toList
     info(s"Derived Data jsons: $goodPairs")
-    val uaContextErrors = uaFirehoseSink.get().map(_.storeEnrichedEvents(goodPairs.filter(_._1 == UA_PARSER_CONTEXT)))
-    val performanceContextErrors = performanceFirehoseSink.get().map(_.storeEnrichedEvents(goodPairs.filter(_._1 == PERFORMANCE_TIMING_CONTEXT)))
+    val uaContextErrors = uaFirehoseSink.get().map(_.storeEnrichedEvents(goodPairs.filter(_._2 == UA_PARSER_CONTEXT)))
+    val performanceContextErrors = performanceFirehoseSink.get().map(_.storeEnrichedEvents(goodPairs.filter(_._2 == PERFORMANCE_TIMING_CONTEXT)))
     if (uaContextErrors == Some(true) || performanceContextErrors == Some(true)) {
       uaFirehoseSink.get.foreach(_.flush())
       performanceFirehoseSink.get().foreach(_.flush())

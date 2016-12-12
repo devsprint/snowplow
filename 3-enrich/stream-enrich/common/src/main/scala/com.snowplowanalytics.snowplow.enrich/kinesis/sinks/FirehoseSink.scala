@@ -162,6 +162,8 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
       case InputType.ShredGood => None
       case InputType.ShredBad => events.foreach(e => debug(s"BadRow: ${e._1}"))
       case InputType.Firehose => None
+      case InputType.UAFirehose => None
+      case InputType.PerformanceFirehose => None
     }
 
     if (FirehoseEventStorage.currentBatch.nonEmpty && System.currentTimeMillis() > nextRequestTime) {

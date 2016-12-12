@@ -45,7 +45,7 @@ class FirehoseSink(provider: AWSCredentialsProvider, config: KinesisConfig,
 
   private val name = inputType match {
     case InputType.Firehose => Some("snowplow")
-    case InputType.UAFirehose => Some("snowplow-ua-paarser")
+    case InputType.UAFirehose => Some("snowplow-ua-parser")
     case InputType.PerformanceFirehose => Some("snowplow-performance")
     case _ => None
   }

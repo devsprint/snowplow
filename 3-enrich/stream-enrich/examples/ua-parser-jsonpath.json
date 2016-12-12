@@ -1,0 +1,18 @@
+{
+  "jsonpaths": [
+    "$['hierarchy\\rootId']",
+    "$['hierarchy\\rootTstamp']",
+    "$['data\\useragentFamily']",
+    "$['data\\useragentMajor']",
+    "$['data\\useragentMinor']",
+    "$['data\\useragentPatch']",
+    "$['data\\useragentVersion']",
+    "$['data\\osFamily']",
+    "$['data\\osMajor']",
+    "$['data\\osMinor']",
+    "$['data\\osPatch']",
+    "$['data\\osPatchMinor']",
+    "$['data\\osVersion']",
+    "$['data\\deviceFamily']"
+  ]
+}

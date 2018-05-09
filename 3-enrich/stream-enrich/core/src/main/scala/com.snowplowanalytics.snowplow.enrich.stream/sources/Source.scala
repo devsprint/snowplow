@@ -195,7 +195,7 @@ abstract class Source(
    * @param evt
    * @return boolean size decision
    */
-  private def isTooLarge(evt: String): Boolean = MaxRecordSize match {
+  def isTooLarge(evt: String): Boolean = MaxRecordSize match {
     case None => false
     case Some(m) => Source.getSize(evt) >= m
   }

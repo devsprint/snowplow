@@ -51,7 +51,7 @@ lazy val allSettings = buildSettings ++
 
 lazy val root = project.in(file("."))
   .settings(buildSettings)
-  .aggregate(core, kinesis, pubsub, kafka, nsq, stdin)
+  .aggregate(core, kinesis, pubsub, kafka, nsq, stdin, shred)
 
 lazy val core = project
   .settings(moduleName := "snowplow-stream-enrich")
@@ -102,3 +102,18 @@ lazy val stdin = project
   .settings(moduleName := "snowplow-stream-enrich-stdin")
   .settings(allSettings)
   .dependsOn(core)
+
+lazy val shred = project
+  .settings(moduleName := "snowplow-stream-shred")
+  .settings(allSettings)
+  .settings(buildSettings)
+  .settings(libraryDependencies ++= commonDependencies)
+  .enablePlugins(BuildInfoPlugin)
+  .settings(
+    buildInfoKeys := Seq[BuildInfoKey](organization, name, version,
+      "commonEnrichVersion" -> Dependencies.V.snowplowCommonEnrich),
+    buildInfoPackage := "com.snowplowanalytics.snowplow.shred.stream.generated"
+  )
+  .dependsOn(core)
+  .dependsOn(kinesis)
+

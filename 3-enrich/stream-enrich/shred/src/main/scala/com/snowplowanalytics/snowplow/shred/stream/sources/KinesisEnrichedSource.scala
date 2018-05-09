@@ -20,7 +20,7 @@ import com.snowplowanalytics.snowplow.enrich.stream.sinks.{KinesisSink, Sink}
 import com.snowplowanalytics.snowplow.enrich.stream.sources.Source
 import com.snowplowanalytics.snowplow.scalatracker.Tracker
 import com.snowplowanalytics.snowplow.shred.stream.KinesisShred
-import com.snowplowanalytics.snowplow.shred.stream.sinks.FirehoseSink
+import com.snowplowanalytics.snowplow.shred.stream.sinks.{FirehoseDeliveryStreams, FirehoseSink}
 import com.snowplowanalytics.snowplow.shred.stream.sources.ShredJob.EventComponents
 import scalaz.Validation
 
@@ -75,7 +75,7 @@ class KinesisEnrichedSource(igluResolver: Resolver,
     AmazonKinesisFirehoseClientBuilder
       .standard()
       .withCredentials(provider)
-      .withEndpointConfiguration(endpointConfiguration)
+      .withRegion(kinesisConfig.region)
       .build()
   }
 
@@ -89,54 +89,55 @@ class KinesisEnrichedSource(igluResolver: Resolver,
       .build()
   }
 
+
   override val threadLocalGoodSink: ThreadLocal[Sink] = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.Firehose, tracker)
   }
 
   val uaFirehoseSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.UAFirehose, tracker)
   }
   val performanceFirehoseSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.PerformanceFirehose, tracker)
   }
   val googleAnalyticsCookiesSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsCookiesFirehose, tracker)
   }
   val googleAnalyticsSocialSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsSocialFirehose, tracker)
   }
   val googleAnalyticsProductImpressionSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsProductImpressionFirehose, tracker)
   }
   val googleAnalyticsTransactionSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsTransactionFirehose, tracker)
   }
   val googleAnalyticsEecomActionSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsEecomActionFirehose, tracker)
   }
   val googleAnalyticsEecomActionFieldSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsEecomActionFieldFirehose, tracker)
   }
   val googleAnalyticsEecomImpressionFieldSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsEecomImpressionFieldFirehose, tracker)
   }
   val googleAnalyticsEecomProductFieldSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsEecomProductFieldFirehose, tracker)
   }
   val googleAnalyticsEecomPromoFieldSink = new ThreadLocal[Sink] {
     override def initialValue: Sink =
-      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, config.out.enriched, tracker)
+      new FirehoseSink(client, kinesisConfig.backoffPolicy, config.buffer, FirehoseDeliveryStreams.GoogleAnalyticsEecomPromoFieldFirehose, tracker)
   }
 
 
@@ -206,7 +207,7 @@ class KinesisEnrichedSource(igluResolver: Resolver,
     }
 
     val goodPairs = good.flatMap(t => t._3).map(t => (t._2.toString, t._1.name)).toList
-    info(s"Derived Data jsons: $goodPairs")
+    //info(s"Derived Data jsons: $goodPairs")
     val uaContextErrors: Boolean = uaFirehoseSink.get().storeEnrichedEvents(goodPairs.filter(_._2 == UA_PARSER_CONTEXT))
 
     val performanceContextErrors = performanceFirehoseSink.get().storeEnrichedEvents(goodPairs.filter(_._2 == PERFORMANCE_TIMING_CONTEXT))

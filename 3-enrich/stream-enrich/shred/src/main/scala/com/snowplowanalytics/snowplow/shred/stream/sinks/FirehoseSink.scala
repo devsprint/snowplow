@@ -30,7 +30,7 @@ object FirehoseSink {
     client = AmazonKinesisFirehoseClientBuilder
       .standard()
       .withCredentials(provider)
-      .withEndpointConfiguration(endpointConfiguration)
+      .withRegion(kinesisConfig.region)
       .build()
     _ <- streamExists(client, firehoseName).leftMap(_.getMessage)
       .ensure(s"Kinesis firehose $firehoseName doesn't exist")(_ == true)

@@ -21,6 +21,8 @@ import Scalaz._
 import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration
 import com.snowplowanalytics.snowplow.enrich.stream.model._
 import com.snowplowanalytics.snowplow.shred.stream.sources.KinesisEnrichedSource
+import com.typesafe.config.ConfigFactory
+import pureconfig._
 
 import scala.collection.JavaConverters._
 import scala.annotation.tailrec
@@ -56,6 +58,33 @@ object KinesisShred extends Enrich {
         tracker.foreach(SnowplowTracking.initializeSnowplowTracking)
         source.run()
     }
+  }
+
+  /**
+    * Parses the configuration from cli arguments
+    * @param args cli arguments
+    * @return a validated tuple containing the parsed enrich configuration, the resolver argument,
+    * the optional enrichments argument and the force download flag
+    */
+  override def parseConfig(
+                   args: Array[String]): \/[String, (EnrichConfig, String, Option[String], Boolean)] = {
+    implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+    implicit val sourceSinkConfigHint = new FieldCoproductHint[SourceSinkConfig]("enabled")
+    for {
+      parsedCliArgs <- \/.fromEither(
+        parser.parse(args, FileConfig()).toRight("Error while parsing command line arguments"))
+      unparsedConfig = utils.fold(Try(ConfigFactory.parseFile(parsedCliArgs.config).resolve()))(
+        t => t.getMessage.left,
+        c => (c, parsedCliArgs.resolver, parsedCliArgs.enrichmentsDir, parsedCliArgs.forceDownload)
+          .right
+      )
+      validatedConfig <- utils.filterOrElse(unparsedConfig)(
+        t => t._1.hasPath("shred"), "No top-level \"shred\" could be found in the configuration")
+      (config, resolverArg, enrichmentsArg, forceDownload) = validatedConfig
+      parsedConfig <- utils.toEither(Try(loadConfigOrThrow[EnrichConfig](config.getConfig("shred"))))
+        .map(ec => (ec, resolverArg, enrichmentsArg, forceDownload))
+        .leftMap(_.getMessage)
+    } yield parsedConfig
   }
 
   override def getSource(
